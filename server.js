@@ -179,6 +179,48 @@ app.get("/payment/canceled", (req, res) => {
   res.json({ status: "canceled", transactionDetails });
 });
 
+//-----------------------------------Payout-----------------------------------//
+
+app.post("/api/payments/payout", async (req, res) => {
+  const { id, amount, paymentReason, notifyUrl, phoneNumber, paymentMethod } =
+    req.body;
+
+  if (!id || !amount || !paymentReason || !phoneNumber || !paymentMethod) {
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required",
+    });
+  }
+
+  try {
+    const payoutResponse = await santimpay.directPayment(
+      id,
+      amount,
+      paymentReason,
+      notifyUrl,
+      phoneNumber,
+      paymentMethod
+    );
+
+    console.log("Payout response:", payoutResponse);
+    res.json({
+      success: true,
+      message: "Payout initiated successfully.",
+      data: payoutResponse,
+    });
+  } catch (error) {
+    console.error("Payout error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to initiate payout.",
+      error: error.message || error,
+    });
+  }
+});
+
+//-----------------------------------Payout-Ends-----------------------------------//
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
