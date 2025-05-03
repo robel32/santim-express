@@ -41,8 +41,7 @@ app.post("/api/payments/initiate", async (req, res) => {
       Math.random() * 1000
     )}`;
 
-    // Construct base URL for callbacks
-    const baseUrl = req.headers.origin || `http://${req.headers.host}`;
+    const baseUrl = "https://santim-express.onrender.com";
 
     // Generate payment URL using SantimPay SDK
     const paymentUrl = await santimpay.generatePaymentUrl(
