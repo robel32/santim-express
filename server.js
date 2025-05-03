@@ -140,10 +140,7 @@ app.get("/payment/success", (req, res) => {
   // this is where you can redirect the user to a success
   res.json({
     status: "success",
-    status: transactionDetails?.Status,
-    txnId: transactionDetails?.txnId,
-    totalAmount: transactionDetails?.totalAmount,
-    paymentVia: transactionDetails?.paymentVia,
+    ...transactionDetails,
   });
 });
 app.get("/payment/failed", (req, res) => {
