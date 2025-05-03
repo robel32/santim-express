@@ -7,11 +7,7 @@ const SantimpaySdk = require("./santim_utils/santimpay-sdk");
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: "http://localhost:3001",
-  })
-);
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
