@@ -193,13 +193,13 @@ app.post("/api/payments/payout", async (req, res) => {
   }
 
   try {
-    const payoutResponse = await santimpay.directPayment(
+    const payoutResponse = await santimpay.sendToCustomer(
       id,
       amount,
       paymentReason,
-      notifyUrl,
       phoneNumber,
-      paymentMethod
+      paymentMethod,
+      notifyUrl
     );
 
     console.log("Payout response:", payoutResponse);
