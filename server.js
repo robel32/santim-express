@@ -134,13 +134,20 @@ app.get("/api/payments/status/:transactionId", async (req, res) => {
 
 // Payment status pages (same as previous implementation)
 app.get("/payment/success", (req, res) => {
-  /* ... */
+  const transactionDetails = req.query;
+
+  console.log("Payment was a success:", transactionDetails);
 });
 app.get("/payment/failed", (req, res) => {
-  /* ... */
+  const transactionDetails = req.query;
+
+  console.log("Payment failed:", transactionDetails);
 });
 app.get("/payment/canceled", (req, res) => {
-  /* ... */
+  const transactionDetails = req.query;
+
+  console.log("Payment was canceled:", transactionDetails);
+  res.json({ status: "canceled", transactionDetails });
 });
 
 // Error handling middleware
