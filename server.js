@@ -137,11 +137,14 @@ app.get("/payment/success", (req, res) => {
   const transactionDetails = req.query;
 
   console.log("Payment was a success:", transactionDetails);
+  // this is where you can redirect the user to a success
+  res.json({ status: "success", transactionDetails });
 });
 app.get("/payment/failed", (req, res) => {
   const transactionDetails = req.query;
 
   console.log("Payment failed:", transactionDetails);
+  res.json({ status: "failed", transactionDetails });
 });
 app.get("/payment/canceled", (req, res) => {
   const transactionDetails = req.query;
