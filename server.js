@@ -18,8 +18,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Initialize SantimPay SDK
 const santimpay = new SantimpaySdk(
   process.env.SANITMPAY_MERCHANT_ID,
-  process.env.SANITMPAY_PRIVATE_KEY,
-  process.env.NODE_ENV !== "production" // Use test bed if not in production
+  process.env.SANITMPAY_PRIVATE_KEY
 );
 
 /**
@@ -92,27 +91,18 @@ app.post("/api/payments/initiate", async (req, res) => {
  */
 app.post("/api/payments/callback", async (req, res) => {
   try {
-    const { id, status, transactionId, amount } = req.body;
+    const { thirdPartyId, Status, totalAmount } = req.body;
 
     console.log("Received payment callback:", {
-      id,
-      status,
-      transactionId,
-      amount,
+      thirdPartyId,
+      Status,
+      totalAmount,
     });
-
-    // Verify the transaction status using SantimPay SDK
-    const transactionStatus = await santimpay.checkTransactionStatus(id);
-    console.log("Verified transaction status:", transactionStatus);
-
     // Update your database with the payment status
     // Example: await updatePaymentStatus(transactionId, status, amount);
-
-    console.log(`Payment ${transactionId} status updated to: ${status}`);
-
     res.json({
       status: "received",
-      transactionId: transactionId,
+      thirdPartyId: thirdPartyId,
     });
   } catch (error) {
     console.error("Callback processing error:", error);

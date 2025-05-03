@@ -1,15 +1,12 @@
 const axios = require("axios");
 const { signES256 } = require("./cryptography.js");
-const { PRODUCTION_BASE_URL, TEST_BASE_URL } = require("./constants.js");
+const { PRODUCTION_BASE_URL } = require("./constants.js");
 
 class SantimpaySdk {
-  constructor(merchantId, privateKey, testBed = false) {
+  constructor(merchantId, privateKey) {
     this.privateKey = privateKey;
     this.merchantId = merchantId;
     this.baseUrl = PRODUCTION_BASE_URL;
-    if (testBed) {
-      this.baseUrl = TEST_BASE_URL;
-    }
   }
   generateSignedTokenForInitiatePayment(amount, paymentReason) {
     const time = Math.floor(Date.now() / 1000);
