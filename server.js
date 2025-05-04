@@ -3,6 +3,9 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const SantimpaySdk = require("./santim_utils/santimpay-sdk");
+const mongoose = require("mongoose");
+const User = require("./models/user.model.js");
+const Transaction = require("./models/transaction.models");
 
 const app = express();
 
@@ -52,7 +55,23 @@ app.post("/api/payments/initiate", async (req, res) => {
       `${baseUrl}/payment/canceled?transactionId=${transactionId}`
     );
 
-    // In a real application, store the transaction in your database here
+    // Save the transaction in the database
+    const transaction = new Transaction({
+      transactionId,
+      type: "PAYMENT",
+      merchantId: process.env.SANITMPAY_MERCHANT_ID,
+      amount,
+      status: "INITIATED",
+      paymentDetails: {
+        orderId,
+        description,
+        phoneNumber,
+        paymentUrl,
+      },
+    });
+
+    await transaction.save();
+
     console.log(`New payment initiated: ${transactionId} for order ${orderId}`);
 
     res.json({
@@ -63,20 +82,10 @@ app.post("/api/payments/initiate", async (req, res) => {
   } catch (error) {
     console.error("Payment initiation error:", error);
 
-    let errorMessage = "Failed to initiate payment";
-    let statusCode = 500;
-
-    if (error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-      statusCode = error.response.status;
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    res.status(statusCode).json({
+    res.status(500).json({
       success: false,
-      message: errorMessage,
-      error: error.response?.data || error.message,
+      message: "Failed to initiate payment.",
+      error: error.message || error,
     });
   }
 });
@@ -94,17 +103,45 @@ app.post("/api/payments/callback", async (req, res) => {
       Status,
       totalAmount,
     });
-    // Update your database with the payment status
-    // Example: await updatePaymentStatus(transactionId, status, amount);
+
+    // Find and update the transaction in the database
+    const transaction = await Transaction.findOneAndUpdate(
+      { santimPayTxnId: thirdPartyId },
+      {
+        $set: {
+          status: Status.toUpperCase(),
+          "paymentDetails.totalAmount": totalAmount,
+        },
+        $push: {
+          webhookData: {
+            thirdPartyId,
+            status: Status,
+            amount: totalAmount,
+            rawData: req.body,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found.",
+      });
+    }
+
     res.json({
-      status: "received",
-      thirdPartyId: thirdPartyId,
+      success: true,
+      message: "Callback processed successfully.",
+      transaction,
     });
   } catch (error) {
     console.error("Callback processing error:", error);
+
     res.status(500).json({
-      status: "error",
-      message: "Callback processing failed",
+      success: false,
+      message: "Callback processing failed.",
     });
   }
 });
@@ -188,7 +225,7 @@ app.post("/api/payments/payout", async (req, res) => {
   if (!id || !amount || !paymentReason || !phoneNumber || !paymentMethod) {
     return res.status(400).json({
       success: false,
-      message: "All fields are required",
+      message: "All fields are required.",
     });
   }
 
@@ -205,7 +242,25 @@ app.post("/api/payments/payout", async (req, res) => {
       notifyUrl
     );
 
+    // Save the payout transaction in the database
+    const transaction = new Transaction({
+      transactionId: id,
+      type: "PAYOUT",
+      merchantId: process.env.SANITMPAY_MERCHANT_ID,
+      amount,
+      status: "INITIATED",
+      payoutDetails: {
+        paymentReason,
+        phoneNumber,
+        paymentMethod,
+        notifyUrl,
+      },
+    });
+
+    await transaction.save();
+
     console.log("Payout response:", payoutResponse);
+
     res.json({
       success: true,
       message: "Payout initiated successfully.",
@@ -233,7 +288,7 @@ app.post("/api/payments/payout-webhook", async (req, res) => {
 
     console.log("Payout webhook received:", req.body);
 
-    // Validate the incoming data (e.g., check signature if provided)
+    // Validate the incoming data
     if (!transactionId || !status) {
       return res.status(400).json({
         success: false,
@@ -241,12 +296,35 @@ app.post("/api/payments/payout-webhook", async (req, res) => {
       });
     }
 
-    // Update your database or perform necessary actions
-    // Example: await updatePayoutStatus(transactionId, status);
+    // Find and update the transaction in the database
+    const transaction = await Transaction.findOneAndUpdate(
+      { transactionId },
+      {
+        $set: { status: status.toUpperCase() },
+        $push: {
+          webhookData: {
+            status,
+            amount,
+            paymentMethod,
+            timestamp,
+            rawData: req.body,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found.",
+      });
+    }
 
     res.json({
       success: true,
       message: "Webhook processed successfully.",
+      transaction,
     });
   } catch (error) {
     console.error("Error processing payout webhook:", error);
@@ -266,8 +344,28 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+app.post("/api/users/deduct-wallet", async (req, res) => {
+  console.log("this is the wallet deduct end point");
+});
+
+app.post("/api/users/add-wallet", async (req, res) => {
+  console.log("this isthe wallet add end point");
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+mongoose
+  .connect(
+    "mongodb+srv://robeltab:FIpwU9hafZJeCcQo@cluster0.evg05.mongodb.net/TelegramGame"
+  )
+  .then(() => {
+    console.log("connected to mongodb");
+  })
+  .catch((error) => {
+    console.log("error connecting to mongodb", error);
+  });
+console.log(`Attempting to start server on port ${PORT}`);
