@@ -17,6 +17,9 @@ const santimpay = new SantimpaySdk(
   process.env.SANITMPAY_PRIVATE_KEY
 );
 
+// Initialize baseUrl for all routes
+const baseUrl = "https://santim-express.onrender.com";
+
 /**
  * Initiate Payment Endpoint
  * POST /api/payments/initiate
@@ -36,8 +39,6 @@ app.post("/api/payments/initiate", async (req, res) => {
     const transactionId = `txn_${Date.now()}_${Math.floor(
       Math.random() * 1000
     )}`;
-
-    const baseUrl = "https://santim-express.onrender.com";
 
     // Generate payment URL using SantimPay SDK
     const paymentUrl = await santimpay.generatePaymentUrl(
@@ -182,8 +183,7 @@ app.get("/payment/canceled", (req, res) => {
 //-----------------------------------Payout-----------------------------------//
 
 app.post("/api/payments/payout", async (req, res) => {
-  const { id, amount, paymentReason, notifyUrl, phoneNumber, paymentMethod } =
-    req.body;
+  const { id, amount, paymentReason, phoneNumber, paymentMethod } = req.body;
 
   if (!id || !amount || !paymentReason || !phoneNumber || !paymentMethod) {
     return res.status(400).json({
@@ -193,6 +193,9 @@ app.post("/api/payments/payout", async (req, res) => {
   }
 
   try {
+    // Use the baseUrl for the notifyUrl
+    const notifyUrl = `${baseUrl}/api/payments/payout-webhook`;
+
     const payoutResponse = await santimpay.sendToCustomer(
       id,
       amount,
@@ -215,6 +218,42 @@ app.post("/api/payments/payout", async (req, res) => {
       success: false,
       message: "Failed to initiate payout.",
       error: error.message || error,
+    });
+  }
+});
+
+/**
+ * Payout Webhook Endpoint
+ * POST /api/payments/payout-webhook
+ */
+app.post("/api/payments/payout-webhook", async (req, res) => {
+  try {
+    const { transactionId, status, amount, paymentMethod, timestamp } =
+      req.body;
+
+    console.log("Payout webhook received:", req.body);
+
+    // Validate the incoming data (e.g., check signature if provided)
+    if (!transactionId || !status) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook payload.",
+      });
+    }
+
+    // Update your database or perform necessary actions
+    // Example: await updatePayoutStatus(transactionId, status);
+
+    res.json({
+      success: true,
+      message: "Webhook processed successfully.",
+    });
+  } catch (error) {
+    console.error("Error processing payout webhook:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to process webhook.",
     });
   }
 });
