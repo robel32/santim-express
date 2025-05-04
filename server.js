@@ -171,39 +171,16 @@ app.get("/api/payments/status/:transactionId", async (req, res) => {
 });
 
 // Payment status pages (same as previous implementation)
-app.get("/payment/success", async (req, res) => {
-  const { transactionId } = req.query;
+app.get("/payment/success", (req, res) => {
+  const transactionDetails = req.query;
 
-  if (!transactionId) {
-    return res.status(400).json({
-      success: false,
-      message: "Transaction ID is missing.",
-    });
-  }
-
-  try {
-    const transactionStatus = await santimpay.checkTransactionStatus(
-      transactionId
-    );
-    console.log("Transaction status:", transactionStatus);
-
-    // Respond with the transaction status
-    res.json({
-      success: true,
-      transactionId,
-      transactionStatus,
-    });
-  } catch (error) {
-    console.error("Error from check transaction santim sdk:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to check transaction status.",
-      error: error.message || error,
-    });
-  }
+  console.log("Payment was a success:", transactionDetails);
+  // this is where you can redirect the user to a success
+  res.json({
+    status: "success",
+    ...transactionDetails,
+  });
 });
-
 app.get("/payment/failed", (req, res) => {
   const transactionDetails = req.query;
 
