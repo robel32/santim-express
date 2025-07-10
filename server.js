@@ -19,9 +19,9 @@ const santimpay = new SantimpaySdk(
   process.env.SANITMPAY_MERCHANT_ID,
   process.env.SANITMPAY_PRIVATE_KEY
 );
-
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 // Initialize baseUrl for all routes
-const baseUrl = "https://santim-express.onrender.com";
+const baseUrl = process.env.BASE_URL;
 
 /**
  * Initiate Payment Endpoint
@@ -30,7 +30,6 @@ const baseUrl = "https://santim-express.onrender.com";
 app.post("/api/payments/initiate", async (req, res) => {
   try {
     const { orderId, amount, description, phoneNumber } = req.body;
-
     if (!orderId || !amount) {
       return res.status(400).json({
         success: false,
@@ -44,8 +43,11 @@ app.post("/api/payments/initiate", async (req, res) => {
     )}`;
 
     // Construct base URL for callbacks
-    const baseUrl = req.headers.origin || `http://${req.headers.host}`;
-
+    const baseUrl =
+      process.env.FRONTEND_BASE_URL ||
+      req.headers.origin ||
+      `http://${req.headers.host}`;
+    console.log(`${baseUrl}/cancelPayment`);
     // Generate payment URL using SantimPay SDK
     const paymentUrl = await santimpay.generatePaymentUrl(
       transactionId,
@@ -55,6 +57,7 @@ app.post("/api/payments/initiate", async (req, res) => {
       `${baseUrl}/payment/failed?transactionId=${transactionId}`,
       `${baseUrl}/api/payments/callback`,
       phoneNumber || "",
+      // `${baseUrl}/cancelPayment`
       `${baseUrl}/payment/canceled?transactionId=${transactionId}`
     );
 
@@ -175,20 +178,22 @@ app.get("/api/payments/status/:transactionId", async (req, res) => {
 
 // Payment status pages (same as previous implementation)
 app.get("/payment/success", (req, res) => {
-  const transactionDetails = req.query;
+  // const transactionDetails = req.query;
 
   console.log("Payment was a success:", transactionDetails);
-  // this is where you can redirect the user to a success
-  res.json({
-    status: "success",
-    ...transactionDetails,
-  });
+  // // this is where you can redirect the user to a success
+  // res.json({
+  //   status: "success",
+  //   ...transactionDetails,
+  // });
+  res.redirect(`${FRONTEND_BASE_URL}/successfullPayment`);
 });
 app.get("/payment/failed", (req, res) => {
-  const transactionDetails = req.query;
+  // const transactionDetails = req.query;
 
   console.log("Payment failed:", transactionDetails);
-  res.json({ status: "failed", transactionDetails });
+  // res.json({ status: "failed", transactionDetails });
+  res.redirect(`${FRONTEND_BASE_URL}/cancelPayment`);
 });
 app.get("/payment/canceled", (req, res) => {
   const transactionDetails = req.query;
@@ -200,17 +205,64 @@ app.get("/payment/canceled", (req, res) => {
 //-----------------------------------Payout-----------------------------------//
 
 app.post("/api/payments/payout", async (req, res) => {
-  const { id, amount, paymentReason, phoneNumber, paymentMethod } = req.body;
+  let { id, amount, paymentReason, phoneNumber, paymentMethod, telegramId } =
+    req.body;
 
-  if (!id || !amount || !paymentReason || !phoneNumber || !paymentMethod) {
+  if (!amount || !phoneNumber || !telegramId) {
     return res.status(400).json({
       success: false,
-      message: "All fields are required.",
+      message: "Amount, Phone Number, and Telegram ID are required.",
     });
   }
 
+  if (!id) {
+    id = `WITHD_${Math.floor(100000 + Math.random() * 900000)}`; // Default Random 6-digit
+  }
+
+  if (!paymentReason) {
+    paymentReason = `ATS-Bingo withdraw order for ${id}`; // Default reason
+  }
+
+  if (!paymentMethod) {
+    paymentMethod = "Telebirr"; // Default payment method
+  }
+
   try {
-    // Use the baseUrl for the notifyUrl
+    // Check the user's wallet balance
+    // const user = await User.findOne({ telegramId });
+
+    if (!user) {
+      console.error("User not found for telegramId:", telegramId);
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Ensure the remaining balance after deduction is more than 10 ETB
+    const remainingBalance = user.walletBalance - parseFloat(amount);
+    if (remainingBalance < 10) {
+      console.error(
+        `Insufficient balance for user ${telegramId}. Remaining balance would be ${remainingBalance}`
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Minimum balance of 10 ETB must be remained in wallet.",
+      });
+    }
+
+    // Deduct the amount from the user's wallet balance
+    const updatedUser = await User.findOneAndUpdate(
+      { telegramId },
+      { $inc: { walletBalance: -parseFloat(amount) } }, // Deduct the amount
+      { new: true }
+    );
+
+    console.log(
+      `Wallet balance deducted for user ${telegramId}: -${amount}. Remaining balance: ${updatedUser.walletBalance}`
+    );
+
+    // Use the baseUrl for the notifyUrl for the payout
     const notifyUrl = `${baseUrl}/api/payments/payout-webhook`;
 
     const payoutResponse = await santimpay.sendToCustomer(
@@ -225,15 +277,16 @@ app.post("/api/payments/payout", async (req, res) => {
     // Save the payout transaction in the database
     const transaction = new Transaction({
       transactionId: id,
-      type: "PAYOUT",
+      type: "WITHDRAW",
       merchantId: process.env.SANITMPAY_MERCHANT_ID,
       amount,
       status: "INITIATED",
+      telegramId,
       payoutDetails: {
         paymentReason,
         phoneNumber,
         paymentMethod,
-        notifyUrl,
+        notifyUrl: notifyUrl,
       },
     });
 
@@ -333,7 +386,7 @@ app.post("/api/users/add-wallet", async (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
